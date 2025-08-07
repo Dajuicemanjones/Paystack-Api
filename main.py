@@ -24,7 +24,7 @@ def create_payment():
         'email': data['email'],
         'amount': int(data['amount']) * 100,  # Convert to kobo
         'currency': 'NGN',  # You can change this to 'USD' if you're using USD on Paystack
-        'callback_url': data['callback_url']
+        'callback_url': data.get('callback_url','https://example.com/callback')
     }
 
     response = requests.post('https://api.paystack.co/transaction/initialize', json=payload, headers=headers)
