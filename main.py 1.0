@@ -1,0 +1,56 @@
+from flask import Flask, request, jsonify
+import requests
+import os
+
+app = Flask(__name__)
+
+# Load your secret key from environment variable
+PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
+if not PAYSTACK_SECRET_KEY:
+    raise ValueError("Missing PAYSTACK_SECRET_KEY environment variable!")
+
+# Function to get real-time USD → NGN rate
+def get_usd_to_ngn_rate():
+    try:
+        response = requests.get("https://api.exchangerate-api.com/v4/latest/USD")
+        data = response.json()
+        return data['rates'].get('NGN', 1600)  # fallback to 1600 if API fails
+    except Exception:
+        return 1600
+
+@app.route('/')
+def home():
+    return 'Paystack payment API is running!'
+
+@app.route('/create-payment', methods=['POST'])
+def create_payment():
+    try:
+        data = request.get_json()
+        amount_usd = float(data.get('amount', 0))
+
+        # Convert USD to NGN (kobo format for Paystack)
+        exchange_rate = get_usd_to_ngn_rate()
+        amount_ngn_kobo = int(amount_usd * exchange_rate * 100)
+
+        payload = {
+            "email": data.get('email'),
+            "amount": amount_ngn_kobo,
+            "currency": "NGN"
+        }
+
+        headers = {
+            "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        r = requests.post("https://api.paystack.co/transaction/initialize",
+                          json=payload, headers=headers)
+        return jsonify(r.json())
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+
+
